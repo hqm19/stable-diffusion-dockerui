@@ -49,16 +49,24 @@ RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
     python3 -m pip install torch==2.0.1 torchvision==0.15.2 --extra-index-url https://download.pytorch.org/whl/cu118
 #grep "torch_command = os.environ.get('TORCH_COMMAND'" modules/launch_utils.py | cut -d '"' -f 2 | cut -d '{' -f 1 | xargs -I {} python3 -m {} https://download.pytorch.org/whl/cu118
 
-# 安装 Clip 需要开启代理
+# 安装 Clip 前开启代理，否则一定失败
 ENV http_proxy="http://${PROXY}"
 ENV https_proxy="http://${PROXY}"
 ENV all_proxy="socks5://${PROXY}"
 
-# 安装 xformers, clip, openclip ngrok
+# 提前于 webui.sh 安装 clip, openclip, xformers, ngrok
 RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
-    grep "xformers_package = os.environ.get('XFORMERS_PACKAGE'" modules/launch_utils.py | cut -d "'" -f 4 | xargs -I {} python3 -m pip install -U -I --no-deps {} && \
+    env | grep proxy && \
     grep "clip_package = os.environ.get('CLIP_PACKAGE'" modules/launch_utils.py | cut -d '"' -f 2 | xargs -I {} python3 -m pip install {} && \
-    grep "openclip_package = os.environ.get('OPENCLIP_PACKAGE'" modules/launch_utils.py | cut -d '"' -f 2 | xargs -I {} python3 -m pip install {} && \
+    grep "openclip_package = os.environ.get('OPENCLIP_PACKAGE'" modules/launch_utils.py | cut -d '"' -f 2 | xargs -I {} python3 -m pip install {}
+
+# 安装 xformers 前去掉代理 (109.1 MB)，否则极容易中断
+ENV http_proxy=
+ENV https_proxy=
+ENV all_proxy=
+RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
+    env | grep proxy && \
+    grep "xformers_package = os.environ.get('XFORMERS_PACKAGE'" modules/launch_utils.py | cut -d "'" -f 4 | xargs -I {} python3 -m pip install -U -I --no-deps {} && \
     python3 -m pip install ngrok
 
 # 创建 clone.sh 脚本文件
@@ -70,36 +78,37 @@ RUN echo "#!/bin/bash" > ./clone.sh && \
     echo 'git remote add origin "$2"'       >>  ./clone.sh && \
     echo 'git fetch origin "$3" --depth=1'  >>  ./clone.sh && \
     echo 'git reset --hard "$3"'            >>  ./clone.sh && \
-    echo 'rm -rf .git'                      >>  ./clone.sh && \
-    chmod +x ./clone.sh
+    # echo 'rm -rf .git'                      >>  ./clone.sh 后面 launch_utils.py 的 git_clone 会检查
+    chmod +x ./clone.sh  && \
+    env | grep proxy 
 
-# clone 仓库前去掉代理设置
-ENV http_proxy=
-ENV https_proxy=
-ENV all_proxy=
-
-# clone 仓库: Stable Diffusion, Stable Diffusion XL, K-diffusion, CodeFormer, BLIP
-RUN grep "stable_diffusion_commit_hash = os.environ.get('STABLE_DIFFUSION_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 \
+# 提前于 webui.sh 克隆仓库: Stable Diffusion, Stable Diffusion XL, K-diffusion, CodeFormer, BLIP
+RUN grep "stable_diffusion_commit_hash = os.environ.get('STABLE_DIFFUSION_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 | \
     xargs -I {} ./clone.sh "stable-diffusion-stability-ai" "https://github.com/Stability-AI/stablediffusion.git" {} && \
     rm -rf assets data/**/*.png data/**/*.jpg data/**/*.gif
 
-RUN grep "stable_diffusion_xl_commit_hash = os.environ.get('STABLE_DIFFUSION_XL_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 \
+RUN grep "stable_diffusion_xl_commit_hash = os.environ.get('STABLE_DIFFUSION_XL_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 | \
     xargs -I {} ./clone.sh "generative-models" "https://github.com/Stability-AI/generative-models.git" {} 
 
-RUN grep "k_diffusion_commit_hash = os.environ.get('K_DIFFUSION_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 \
+RUN grep "k_diffusion_commit_hash = os.environ.get('K_DIFFUSION_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 | \
     xargs -I {} ./clone.sh "k-diffusion" "https://github.com/crowsonkb/k-diffusion.git" {} 
 
-RUN grep "codeformer_commit_hash = os.environ.get('CODEFORMER_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 \
-    xargs -I {} ./clone.sh "CodeFormer" "https://github.com/sczhou/CodeFormer.git" {} && \
-    && rm -rf assets inputs
+# CodeFormer 和 BLIP 两个的 github 仓库都需要加代理才能 clone 成功
+ENV http_proxy="http://${PROXY}"
+ENV https_proxy="http://${PROXY}"
+ENV all_proxy="socks5://${PROXY}"
 
-RUN grep "blip_commit_hash = os.environ.get('BLIP_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 \
+RUN grep "codeformer_commit_hash = os.environ.get('CODEFORMER_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 | \
+    xargs -I {} ./clone.sh "CodeFormer" "https://github.com/sczhou/CodeFormer.git" {} && \
+    rm -rf assets inputs
+
+RUN grep "blip_commit_hash = os.environ.get('BLIP_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 | \
     xargs -I {} ./clone.sh "BLIP" "https://github.com/salesforce/BLIP.git" {} 
 
-# 安装 CodeFormer requirements 和 stable-diffusion-webui 的 requirements_versions.txt
+# 提前于 webui.sh 安装 CodeFormer requirements 和 stable-diffusion-webui 自身的 requirements_versions.txt
 RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
     echo "install CodeFormer requirements ..." && \
-    pip install -r ./repositories/CodeFormer/requirements_versions.txt && \
+    pip install -r ./repositories/CodeFormer/requirements.txt && \
     echo "install requirements ..." && \
     pip install -r requirements_versions.txt
 
