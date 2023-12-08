@@ -97,12 +97,13 @@ RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
     echo "----- install requirements -----" && \
     pip install -r requirements_versions.txt
 
-# 关闭 venv
+ARG AUTH=rtx3090:ST0Nbs5AL+5hy4J
+# 因为容器已经提供了完美的隔离环境，不需要其他 python 隔离手段了，所以关闭 venv
 ENV use_venv=0
 ENV venv_dir="-"
 # 设置命令行，加上 --skip-torch-cuda-test
 ENV NVIDIA_VISIBLE_DEVICES=all
-ENV COMMANDLINE_ARGS="--port ${PORT} --allow-code --medvram --xformers --enable-insecure-extension-access --gradio-auth rtx3090:ST0Nbs5AL+5hy4J --api --skip-torch-cuda-test"
+ENV COMMANDLINE_ARGS="--listen --port ${PORT} --allow-code --medvram --xformers --enable-insecure-extension-access --gradio-auth ${AUTH} --api --skip-torch-cuda-test"
 ENV EXIT_ON_IMAGE_BUILD=1
 # 修改 launch_utils.py，在 start() 函数开始时，设置一个退出点，以使 docker build 过程不要直接启动 webui 服务
 RUN sed -i '/def start():/a \ \ \ \ \n\ \ \ \ # ------ make a docker build cache point ------ \n\ \ \ \ if os.getenv("EXIT_ON_IMAGE_BUILD") == "1":\n\ \ \ \ \ \ \ \ print("EXIT_ON_IMAGE_BUILD is 1, exiting.")\n\ \ \ \ \ \ \ \ sys.exit()\n' ./modules/launch_utils.py && \
@@ -117,7 +118,7 @@ RUN chmod +x ./webui.sh &&  ./webui.sh -f
 ENV EXIT_ON_IMAGE_BUILD=0
 
 # remove --skip-torch-cuda-test
-ENV COMMANDLINE_ARGS="--port ${PORT} --allow-code --medvram --xformers --enable-insecure-extension-access --gradio-auth rtx3090:ST0Nbs5AL+5hy4J --api"
+ENV COMMANDLINE_ARGS="--listen --port ${PORT} --allow-code --medvram --xformers --enable-insecure-extension-access --gradio-auth ${AUTH} --api"
 
 EXPOSE ${PORT}
 # #ENTRYPOINT ["/docker/entrypoint.sh"]
@@ -134,8 +135,8 @@ CMD ./webui.sh -f
 # mkdir -p models extensions huggingface.co
 #
 # 用构建好的镜像，启动交互式容器：
-# docker run --gpus all -it -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" stable-diffusion-webui:20231208 bash
+# docker run --name sd-webui --gpus all -it -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" stable-diffusion-webui:20231208 bash
 #
 # 用构建好的镜像，启动后台运行容器：
-# docker run --gpus all -d -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" stable-diffusion-webui:20231208
+# docker run --name sd-webui --gpus all -d -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" stable-diffusion-webui:20231208
 #

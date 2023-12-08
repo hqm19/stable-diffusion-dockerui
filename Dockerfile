@@ -1,7 +1,5 @@
 FROM python:3.10.6
 
-WORKDIR /home
-
 ARG PROXY
 ARG PORT=7860
 
@@ -22,15 +20,18 @@ RUN --mount=type=cache,target=/var/cache/apt \
     apt-get install -y libgl1
 
 # 多分一层，避免因 git clone 失败前面的包要重新安装
-RUN git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui sd-webui && \
-    export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}" all_proxy="socks5://${PROXY}" && \
-    env | grep proxy && echo "----- clone stable-diffusion-webui -----" && \
-    # 在 Installing torch and torchvision 之后，设置上网代理
-    # sed -i '/startup_timer.record("install torch")/a \ \ \ \ \n\ \ \ \ # ------ add proxy begin ------ \n\ \ \ \ os.environ["http_proxy"] = "http://10.10.0.8:10887"\n\ \ \ \ os.environ["https_proxy"] = "http://10.10.0.8:10887"\n\ \ \ \ os.environ["all_proxy"] = "socks5://10.10.0.8:10887"\n\ \ \ \ print("Current proxy settings:")\n\ \ \ \ for key in ["http_proxy", "https_proxy", "all_proxy"]:\n\ \ \ \ \ \ \ \ print(f"{key}={os.environ.get(key)}")\n\ \ \ \ # ------ add proxy end ------' ./sd-webui/modules/launch_utils.py
-    # sed -i '/startup_timer.record("install torch")/a \ \ \ \ \n\ \ \ \ # ------ add proxy begin ------ \n\ \ \ \ os.environ["http_proxy"] = "http://'${PROXY}'"\n\ \ \ \ os.environ["https_proxy"] = "http://'${PROXY}'"\n\ \ \ \ os.environ["all_proxy"] = "socks5://'${PROXY}'"\n\ \ \ \ print("Current proxy settings:")\n\ \ \ \ for key in ["http_proxy", "https_proxy", "all_proxy"]:\n\ \ \ \ \ \ \ \ print(f"{key}={os.environ.get(key)}")\n\ \ \ \ # ------ add proxy end ------' ./sd-webui/modules/launch_utils.py && \
-    # 在 start() 函数开始时清除代理设置 
-    sed -i '/def start():/a \ \ \ \ \n\ \ \ \ # ------ clean proxy begin ------ \n\ \ \ \ os.environ.pop("http_proxy", None)\n\ \ \ \ os.environ.pop("https_proxy", None)\n\ \ \ \ os.environ.pop("all_proxy", None)\n\ \ \ \ print("Current proxy settings:")\n\ \ \ \ for key in ["http_proxy", "https_proxy", "all_proxy"]:\n\ \ \ \ \ \ \ \ print(f"{key}={os.environ.get(key)}")\n\ \ \ \ # ------ clean proxy end ------\n\ \ \ \ ' ./sd-webui/modules/launch_utils.py
+# RUN git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui sd-webui && \
 
+#############################################################################################
+#
+# 要求在 host 上已经 clone 好的 stable-diffusion-webui 的同级目录下执行，即 Dockerfile 和 stable-diffusion-webui 平级，例如
+# -rw-r--r--  1 root root  8550 Dec  7 23:26 Dockerfile
+# drwxr-xr-x  2 root root  4096 Dec  5 18:01 extensions/
+# drwxr-xr-x  2 root root  4096 Dec  7 21:54 huggingface.co/
+# drwxr-xr-x 14 root root  4096 Dec  7 17:46 models/
+# drwxr-xr-x 16 root root  4096 Dec  7 23:30 stable-diffusion-webui/
+#
+COPY ./stable-diffusion-webui /home/sd-webui
 WORKDIR /home/sd-webui
 
 # 提前于 webui.sh 安装 torch, torchvision, 方便 docker build 缓存；
@@ -96,16 +97,19 @@ RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
     echo "----- install requirements -----" && \
     pip install -r requirements_versions.txt
 
-# 关闭 venv
+ARG AUTH=rtx3090:ST0Nbs5AL+5hy4J
+# 因为容器已经提供了完美的隔离环境，不需要其他 python 隔离手段了，所以关闭 venv
 ENV use_venv=0
 ENV venv_dir="-"
 # 设置命令行，加上 --skip-torch-cuda-test
 ENV NVIDIA_VISIBLE_DEVICES=all
-ENV COMMANDLINE_ARGS="--port ${PORT} --allow-code --medvram --xformers --enable-insecure-extension-access --gradio-auth rtx3090:ST0Nbs5AL+5hy4J --api --skip-torch-cuda-test"
+ENV COMMANDLINE_ARGS="--listen --port ${PORT} --allow-code --medvram --xformers --enable-insecure-extension-access --gradio-auth ${AUTH} --api --skip-torch-cuda-test"
 ENV EXIT_ON_IMAGE_BUILD=1
 # 修改 launch_utils.py，在 start() 函数开始时，设置一个退出点，以使 docker build 过程不要直接启动 webui 服务
 RUN sed -i '/def start():/a \ \ \ \ \n\ \ \ \ # ------ make a docker build cache point ------ \n\ \ \ \ if os.getenv("EXIT_ON_IMAGE_BUILD") == "1":\n\ \ \ \ \ \ \ \ print("EXIT_ON_IMAGE_BUILD is 1, exiting.")\n\ \ \ \ \ \ \ \ sys.exit()\n' ./modules/launch_utils.py && \
-    # 修改 repositorie·s 代码文件，将 clip-vit-large-patch14 的路径改为本地路径，避免从 huggingface.co 下载
+    # 在 start() 函数开始时清除代理设置 
+    sed -i '/def start():/a \ \ \ \ \n\ \ \ \ # ------ clean proxy begin ------ \n\ \ \ \ os.environ.pop("http_proxy", None)\n\ \ \ \ os.environ.pop("https_proxy", None)\n\ \ \ \ os.environ.pop("all_proxy", None)\n\ \ \ \ print("Current proxy settings:")\n\ \ \ \ for key in ["http_proxy", "https_proxy", "all_proxy"]:\n\ \ \ \ \ \ \ \ print(f"{key}={os.environ.get(key)}")\n\ \ \ \ # ------ clean proxy end ------\n\ \ \ \ ' ./modules/launch_utils.py && \
+    # 修改 repositories 代码文件，将 clip-vit-large-patch14 的路径改为本地路径，避免从 huggingface.co 下载
     sed -i 's|"openai/clip-vit-large-patch14"|"/home/sd-webui/huggingface.co/openai/clip-vit-large-patch14"|g' ./repositories/stable-diffusion-stability-ai/ldm/modules/encoders/modules.py  && \
     sed -i 's|"openai/clip-vit-large-patch14"|"/home/sd-webui/huggingface.co/openai/clip-vit-large-patch14"|g' ./repositories/generative-models/sgm/modules/encoders/modules.py
 
@@ -114,7 +118,7 @@ RUN chmod +x ./webui.sh &&  ./webui.sh -f
 ENV EXIT_ON_IMAGE_BUILD=0
 
 # remove --skip-torch-cuda-test
-ENV COMMANDLINE_ARGS="--port ${PORT} --allow-code --medvram --xformers --enable-insecure-extension-access --gradio-auth rtx3090:ST0Nbs5AL+5hy4J --api"
+ENV COMMANDLINE_ARGS="--listen --port ${PORT} --allow-code --medvram --xformers --enable-insecure-extension-access --gradio-auth ${AUTH} --api"
 
 EXPOSE ${PORT}
 # #ENTRYPOINT ["/docker/entrypoint.sh"]
@@ -131,8 +135,8 @@ CMD ./webui.sh -f
 # mkdir -p models extensions huggingface.co
 #
 # 用构建好的镜像，启动交互式容器：
-# docker run --gpus all -it -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" stable-diffusion-webui:20231208 bash
+# docker run --name sd-webui --gpus all -it -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" stable-diffusion-webui:20231208 bash
 #
 # 用构建好的镜像，启动后台运行容器：
-# docker run --gpus all -d -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" stable-diffusion-webui:20231208
+# docker run --name sd-webui --gpus all -d -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" stable-diffusion-webui:20231208
 #
