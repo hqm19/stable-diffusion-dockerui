@@ -128,15 +128,15 @@ CMD ./webui.sh -f
 #
 # ----- 用法 -----
 # 构建镜像：
-# nohup docker build --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7880 -t stable-diffusion-webui:20231208 . > build.log 2>&1 &
+# nohup docker build --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7880 --build-arg AUTH=admin:changeitsoon -t sd-webui:20231208 . > build.log 2>&1 &
 # tail -100f build.log
 #
 # 启动容器前，创建好挂载目录
-# mkdir -p models extensions huggingface.co
-#
-# 用构建好的镜像，启动交互式容器：
-# docker run --name sd-webui --gpus all -it -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" stable-diffusion-webui:20231208 bash
+# mkdir -p models extensions huggingface.co outputs
 #
 # 用构建好的镜像，启动后台运行容器：
-# docker run --name sd-webui --gpus all -d -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" stable-diffusion-webui:20231208
+# docker run --name sd-webui --gpus all -d -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" -v"${PWD}/outputs:/home/sd-webui/outputs" sd-webui:20231208
+#
+# 用构建好的镜像，启动交互式容器(不启动 webui 服务)：
+# docker run --name sd-webui --gpus all -it -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" -v"${PWD}/outputs:/home/sd-webui/outputs" sd-webui:20231208 bash
 #
