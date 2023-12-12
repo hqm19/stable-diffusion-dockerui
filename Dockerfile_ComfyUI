@@ -1,0 +1,80 @@
+FROM python:3.10.6
+
+ARG PROXY
+ARG PORT=7960
+
+# debian 下安装访问 http://deb.debian.org/debian 等需要设置代理
+# ENV http_proxy="http://${PROXY}"
+# ENV https_proxy="http://${PROXY}"
+# ENV all_proxy="socks5://${PROXY}"
+
+# 安装基础包
+RUN --mount=type=cache,target=/var/cache/apt \ 
+    export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}" all_proxy="socks5://${PROXY}" && \
+    env | grep proxy && echo "----- install vim net-tools telnet libgl1 -----" && \
+    apt-get update && \
+    apt-get install -y vim-tiny net-tools telnet && \
+    # resolv ImportError: libGL.so.1: cannot open shared object file: No such file or directory
+    # when Launching Web UI with arguments
+    # see https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues/10411
+    apt-get install -y libgl1
+
+# 多分一层，避免因 git clone 失败前面的包要重新安装
+# RUN git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui sd-webui && \
+
+#############################################################################################
+#
+# 要求在 host 上已经 clone 好的 ComfyUI 的同级目录下执行，即 Dockerfile 和 ComfyUI 平级，例如
+# drwxr-xr-x 17 root root  4096 Dec  8 18:23 ComfyUI/
+# -rw-r--r--  1 root root  8550 Dec  7 23:26 Dockerfile
+#
+COPY ./ComfyUI /home/comfyui
+WORKDIR /home/comfyui
+
+# 提前于 webui.sh 安装 torch, torchvision, 方便 docker build 缓存；
+# torch版本号来自 stable-diffusion-webui/modules/launch_utils.py
+# grep "torch_command = os.environ.get('TORCH_COMMAND'" modules/launch_utils.py | cut -d '"' -f 2 | cut -d '{' -f 1 | xargs -I {} python3 -m {} https://download.pytorch.org/whl/cu118
+RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
+    # 安装 torch 不能设置代理，否则2g+的包下载不下来
+    export http_proxy="" https_proxy="" all_proxy="" && \
+    env | grep proxy && echo "----- install torch and torchvision -----" && \
+    # resolv the err: Using SOCKS proxy, but the 'socksio' package is not installed
+    pip install httpx[socks] && \
+    pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu121
+
+# 安装 requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
+    echo "----- install requirements -----" && \
+    pip install -r requirements.txt && \
+    # 提前安装 mixlab-nodes 插件需要的依赖到镜像中：https://github.com/shadowcz007/comfyui-mixlab-nodes/blob/main/requirements.txt
+    pip install numpy pyOpenSSL watchdog opencv-python-headless matplotlib
+
+
+# # 修改 launch_utils.py，在 start() 函数开始时，设置一个退出点，以使 docker build 过程不要直接启动 webui 服务
+# RUN sed -i '/def start():/a \ \ \ \ \n\ \ \ \ # ------ make a docker build cache point ------ \n\ \ \ \ if os.getenv("EXIT_ON_IMAGE_BUILD") == "1":\n\ \ \ \ \ \ \ \ print("EXIT_ON_IMAGE_BUILD is 1, exiting.")\n\ \ \ \ \ \ \ \ sys.exit()\n' ./modules/launch_utils.py && \
+#     # 在 start() 函数开始时清除代理设置 
+#     sed -i '/def start():/a \ \ \ \ \n\ \ \ \ # ------ clean proxy begin ------ \n\ \ \ \ os.environ.pop("http_proxy", None)\n\ \ \ \ os.environ.pop("https_proxy", None)\n\ \ \ \ os.environ.pop("all_proxy", None)\n\ \ \ \ print("Current proxy settings:")\n\ \ \ \ for key in ["http_proxy", "https_proxy", "all_proxy"]:\n\ \ \ \ \ \ \ \ print(f"{key}={os.environ.get(key)}")\n\ \ \ \ # ------ clean proxy end ------\n\ \ \ \ ' ./modules/launch_utils.py && \
+#     # 修改 repositories 代码文件，将 clip-vit-large-patch14 的路径改为本地路径，避免从 huggingface.co 下载
+#     sed -i 's|"openai/clip-vit-large-patch14"|"/home/sd-webui/huggingface.co/openai/clip-vit-large-patch14"|g' ./repositories/stable-diffusion-stability-ai/ldm/modules/encoders/modules.py  && \
+#     sed -i 's|"openai/clip-vit-large-patch14"|"/home/sd-webui/huggingface.co/openai/clip-vit-large-patch14"|g' ./repositories/generative-models/sgm/modules/encoders/modules.py
+
+EXPOSE ${PORT}
+# #ENTRYPOINT ["/docker/entrypoint.sh"]
+# CMD python -u webui.py --listen ${COMMANDLINE_ARGS}
+CMD python main.py
+
+#
+# ----- 用法 -----
+# 构建镜像：
+# nohup docker build --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7880 --build-arg AUTH=admin:changeitsoon -t sd-webui:20231208 . > build.log 2>&1 &
+# tail -100f build.log
+#
+# 启动容器前，创建好挂载目录
+# mkdir -p models extensions huggingface.co outputs
+#
+# 用构建好的镜像，启动后台运行容器：
+# docker run --name sd-webui --gpus all -d -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" -v"${PWD}/outputs:/home/sd-webui/outputs" sd-webui:20231208
+#
+# 用构建好的镜像，启动交互式容器(不启动 webui 服务)：
+# docker run --name sd-webui --gpus all -it -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" -v"${PWD}/outputs:/home/sd-webui/outputs" sd-webui:20231208 bash
+#
