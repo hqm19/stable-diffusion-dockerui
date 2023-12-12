@@ -19,19 +19,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
     # see https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues/10411
     apt-get install -y libgl1
 
-# 多分一层，避免因 git clone 失败前面的包要重新安装
-# RUN git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui sd-webui && \
-
-#############################################################################################
-#
-# 要求在 host 上已经 clone 好的 ComfyUI 的同级目录下执行，即 Dockerfile 和 ComfyUI 平级，例如
-# drwxr-xr-x 17 root root  4096 Dec  8 18:23 ComfyUI/
-# -rw-r--r--  1 root root  8550 Dec  7 23:26 Dockerfile
-#
-COPY ./ComfyUI /home/comfyui
-WORKDIR /home/comfyui
-
-# 提前于 webui.sh 安装 torch, torchvision, 方便 docker build 缓存；
+# 安装 ComfyUI 依赖的 torch, torchvision, 方便 docker build 缓存；
 # torch版本号来自 stable-diffusion-webui/modules/launch_utils.py
 # grep "torch_command = os.environ.get('TORCH_COMMAND'" modules/launch_utils.py | cut -d '"' -f 2 | cut -d '{' -f 1 | xargs -I {} python3 -m {} https://download.pytorch.org/whl/cu118
 RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
@@ -39,15 +27,30 @@ RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
     export http_proxy="" https_proxy="" all_proxy="" && \
     env | grep proxy && echo "----- install torch and torchvision -----" && \
     # resolv the err: Using SOCKS proxy, but the 'socksio' package is not installed
-    pip install httpx[socks] && \
+    # pip install httpx[socks] && \
     pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu121
+
+
+#############################################################################################
+#
+# 要求在 host 上已经 clone 好的 ComfyUI 的同级目录下执行，即 Dockerfile 和 ComfyUI 平级，例如
+# drwxr-xr-x 17 root root  4096 Dec  8 18:23 ComfyUI/
+# -rw-r--r--  1 root root  8550 Dec  7 23:26 Dockerfile_ComfyUI
+#
+COPY ./ComfyUI /home/comfyui
+WORKDIR /home/comfyui
 
 # 安装 requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
     echo "----- install requirements -----" && \
-    pip install -r requirements.txt && \
-    # 提前安装 mixlab-nodes 插件需要的依赖到镜像中：https://github.com/shadowcz007/comfyui-mixlab-nodes/blob/main/requirements.txt
-    pip install numpy pyOpenSSL watchdog opencv-python-headless matplotlib
+    pip install -r requirements.txt
+
+# 提前安装 mixlab-nodes 插件需要的依赖到镜像中. 需要提前将 https://github.com/shadowcz007/comfyui-mixlab-nodes clone 到 ComfyUI/custom_nodes 目录下
+RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
+    echo "----- install requirements of mixlab-nodes -----" && \
+    # 直接安装其内容：https://github.com/shadowcz007/comfyui-mixlab-nodes/blob/main/requirements.txt
+    # pip install numpy pyOpenSSL watchdog opencv-python-headless matplotlib
+    pip install -r custom_nodes/comfyui-mixlab-nodes/requirements.txt
 
 
 # # 修改 launch_utils.py，在 start() 函数开始时，设置一个退出点，以使 docker build 过程不要直接启动 webui 服务
@@ -66,15 +69,12 @@ CMD python main.py
 #
 # ----- 用法 -----
 # 构建镜像：
-# nohup docker build --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7880 --build-arg AUTH=admin:changeitsoon -t sd-webui:20231208 . > build.log 2>&1 &
+# nohup docker build -f ./Dockerfile_ComfyUI --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7980 -t sd-comfyui:20231208 . > build.log 2>&1 &
 # tail -100f build.log
 #
 # 启动容器前，创建好挂载目录
 # mkdir -p models extensions huggingface.co outputs
 #
 # 用构建好的镜像，启动后台运行容器：
-# docker run --name sd-webui --gpus all -d -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" -v"${PWD}/outputs:/home/sd-webui/outputs" sd-webui:20231208
-#
-# 用构建好的镜像，启动交互式容器(不启动 webui 服务)：
-# docker run --name sd-webui --gpus all -it -p 7880:7880 -v "${PWD}/models:/home/sd-webui/models" -v "${PWD}/extensions:/home/sd-webui/extensions" -v"${PWD}/huggingface.co:/home/sd-webui/huggingface.co" -v"${PWD}/outputs:/home/sd-webui/outputs" sd-webui:20231208 bash
+# docker run --name sd-comfyui --gpus all -d -p 7980:7980   -v "${PWD}/custom_nodes:/home/comfyui/custom_nodes"   -v "${PWD}/models:/home/comfyui/models" -v"${PWD}/huggingface.co:/home/comfyui/huggingface.co"   -v "${PWD}/outputs:/home/comfyui/output" sd-comfyui:20231208 python -u main.py --listen --port 7980
 #
