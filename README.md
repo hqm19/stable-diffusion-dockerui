@@ -34,11 +34,21 @@ nohup docker build --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7880 --bui
 tail -100f build.log
 ```
 
-直到镜像构建完成。如果中途因网络问题中断，只需反复重新执行最后一条 docker build 语句，直到完成。docker 构建过程会缓存中间结果, 将失败重试时重复的下载和安装降到最低
+直到镜像构建完成。如果中途因网络问题中断，只需反复重新执行最后一条 docker build 语句:
+```
+nohup docker build -f ./Dockerfile_WebUI --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7880 --build-arg AUTH=admin:changeitsoon -t sd-webui:20231208 . > build.log 2>&1 &
+```
 
-其中构建参数 PORT 是镜像中的 webui 默认监听端口。也可以在启动容器时被 CMD 参数覆盖
+直到完成。docker 构建过程会缓存中间结果, 将失败重试时重复的下载和安装降到最低
 
-镜像构建好后，可以查看镜像列表：
+其中
+* --build-arg PROXY=10.10.0.8:10887 指定了构建和运行期需要科学上网时的本地https/http代理
+* --build-arg PORT=7880 指定了镜像中的 webui 默认监听端口。也可以在启动容器时被 CMD 参数覆盖
+* --build-arg AUTH=admin:changeitsoon 指定了容器服务启动后，默认的账户和密码。
+* -t sd-webui:20231208 是构建后的镜像名，tag 建议和 Stable Diffusion WebUI 的更新日期保持一致方便区分
+* 最前面的 nohup 和 最后的 > build.log 2>&1 & 是将过程日志重定向到 build.log 方便查看，同时将构建过程放在后台，shell 断连后还能继续构建
+
+镜像构建成功后，可以查看到镜像列表：
 
 ```
 $ docker images | grep sd-webui
@@ -141,6 +151,10 @@ $ docker ps -a | grep sd-webui
 
 ### ComfyUI 镜像构建过程
 
+```
+# nohup docker build -f ./Dockerfile_ComfyUI --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7980 -t sd-comfyui:20231214 . > build.log 2>&1 &
+# tail -100f build.log
+```
 
 ### ComfyUI 容器启动方式
 

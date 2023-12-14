@@ -128,7 +128,7 @@ CMD ./webui.sh -f
 #
 # ----- 用法 -----
 # 构建镜像：
-# nohup docker build --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7880 --build-arg AUTH=admin:changeitsoon -t sd-webui:20231208 . > build.log 2>&1 &
+# nohup docker build -f ./Dockerfile_WebUI --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7880 --build-arg AUTH=admin:changeitsoon -t sd-webui:20231208 . > build.log 2>&1 &
 # tail -100f build.log
 #
 # 启动容器前，创建好挂载目录
