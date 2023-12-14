@@ -45,12 +45,22 @@ RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
     echo "----- install requirements -----" && \
     pip install -r requirements.txt
 
-# 提前安装 mixlab-nodes 插件需要的依赖到镜像中. 需要提前将 https://github.com/shadowcz007/comfyui-mixlab-nodes clone 到 ComfyUI/custom_nodes 目录下
+# 提前安装 ComfyUI-Manager、comfyui_controlnet_aux、mixlab-nodes、ComfyUI_Custom_Nodes_AlekPet 等插件需要的依赖到镜像中. 
+# 需要提前将 https://github.com/shadowcz007/comfyui-mixlab-nodes 等插件仓库 clone 到 ComfyUI/custom_nodes 目录下
 RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
+    echo "----- install requirements of ComfyUI-Manager -----" && \
+    pip install -r custom_nodes/ComfyUI-Manager/requirements.txt  && \
+    echo "----- install requirements of comfyui_controlnet_aux -----" && \
+    pip install -r custom_nodes/comfyui_controlnet_aux/requirements.txt  && \
     echo "----- install requirements of mixlab-nodes -----" && \
     # 直接安装其内容：https://github.com/shadowcz007/comfyui-mixlab-nodes/blob/main/requirements.txt
     # pip install numpy pyOpenSSL watchdog opencv-python-headless matplotlib
-    pip install -r custom_nodes/comfyui-mixlab-nodes/requirements.txt
+    pip install -r custom_nodes/comfyui-mixlab-nodes/requirements.txt && \
+    echo "----- install requirements of ComfyUI_Custom_Nodes_AlekPet -----" && \
+    pip install -r custom_nodes/ComfyUI_Custom_Nodes_AlekPet/ArgosTranslateNode/requirements.txt  && \
+    pip install -r custom_nodes/ComfyUI_Custom_Nodes_AlekPet/TranslateNode/requirements.txt  && \
+    pip install -r custom_nodes/ComfyUI_Custom_Nodes_AlekPet/ArgosTranslateNode/requirements.txt  && \
+    ls -l custom_nodes
 
 
 # # 修改 launch_utils.py，在 start() 函数开始时，设置一个退出点，以使 docker build 过程不要直接启动 webui 服务
@@ -62,19 +72,18 @@ RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
 #     sed -i 's|"openai/clip-vit-large-patch14"|"/home/sd-webui/huggingface.co/openai/clip-vit-large-patch14"|g' ./repositories/generative-models/sgm/modules/encoders/modules.py
 
 EXPOSE ${PORT}
-# #ENTRYPOINT ["/docker/entrypoint.sh"]
-# CMD python -u webui.py --listen ${COMMANDLINE_ARGS}
-CMD python main.py
+ENV PORT=${PORT}
+CMD python -u main.py --listen --port ${PORT}
 
 #
 # ----- 用法 -----
 # 构建镜像：
-# nohup docker build -f ./Dockerfile_ComfyUI --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7980 -t sd-comfyui:20231208 . > build.log 2>&1 &
+# nohup docker build -f ./Dockerfile_ComfyUI --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7980 -t sd-comfyui:20231214 . > build.log 2>&1 &
 # tail -100f build.log
 #
 # 启动容器前，创建好挂载目录
-# mkdir -p models extensions huggingface.co outputs
+# mkdir -p models extensions custom_nodes outputs
 #
 # 用构建好的镜像，启动后台运行容器：
-# docker run --name sd-comfyui --gpus all -d -p 7980:7980   -v "${PWD}/custom_nodes:/home/comfyui/custom_nodes"   -v "${PWD}/models:/home/comfyui/models" -v"${PWD}/huggingface.co:/home/comfyui/huggingface.co"   -v "${PWD}/outputs:/home/comfyui/output" sd-comfyui:20231208 python -u main.py --listen --port 7980
+# docker run --name sd-comfyui --gpus all -d -p 7980:7980 -v "${PWD}/ComfyUI/custom_nodes:/home/comfyui/custom_nodes"  -v "${PWD}/models:/home/comfyui/models" -v "${PWD}/outputs:/home/comfyui/output" sd-comfyui:20231214
 #
