@@ -4,9 +4,15 @@ Stable Diffusion DockerUI
 为 Stable Diffusion 流行的 UI 工程编写的 Dockerfile
 -----------
 
-主要目的是为了解决国内网络不稳定不畅通的问题。正常安装过程中，部分资源需要科学上网，部分资源又需要直连才能成功。所以在 Dockerfile 中统一解决这些问题。希望自己和需要的人不需要再重复折腾了。
+为什么要做这个：
+1. 主要目的是为了解决国内网络不稳定不畅通的问题。正常安装过程中，部分资源需要科学上网，部分资源又需要直连才能成功。所以在 Dockerfile 中统一解决这些问题。希望自己和需要的人不需要再重复折腾了。
+2. 这个工程 https://github.com/AbdBarho/stable-diffusion-webui-docker 用了下，比较旧了，貌似也不维护了。它其中很多依赖的 repo 都是写死一个 commit ID，让人非常不安。所以自己做一个
 
-可以一键构建如下 UI 的 Docker 镜像：
+主要内容就是两个 Dockerfile：
+* Dockerfile_ComfyUI
+* Dockerfile_WebUI
+
+可以分别用来一键构建如下 UI 的 Docker 镜像：
 * [Stable Diffusion WebUI](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
 * [ComfyUI](https://github.com/comfyanonymous/ComfyUI)
 
