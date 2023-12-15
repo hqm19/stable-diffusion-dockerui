@@ -39,7 +39,7 @@ Stable Diffusion DockerUI
 ```
 git clone git@github.com:hqm19/stable-diffusion-dockerui.git && cd stable-diffusion-dockerui
 git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui
-nohup docker build --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7880 --build-arg AUTH=admin:changeitsoon -t sd-webui:20231208 . > build.log 2>&1 &
+nohup docker build -f ./Dockerfile_WebUI --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7880 --build-arg AUTH=admin:changeitsoon -t sd-webui:20231208 . > build.log 2>&1 &
 
 tail -100f build.log
 ```
