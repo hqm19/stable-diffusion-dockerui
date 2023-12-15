@@ -81,9 +81,6 @@ CMD python -u main.py --listen --port ${PORT}
 # nohup docker build -f ./Dockerfile_ComfyUI --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7980 -t sd-comfyui:20231214 . > build.log 2>&1 &
 # tail -100f build.log
 #
-# 启动容器前，创建好挂载目录
-# mkdir -p models extensions custom_nodes outputs
-#
 # 用构建好的镜像，启动后台运行容器：
 # docker run --name sd-comfyui --gpus all -d -p 7980:7980 -v "${PWD}/ComfyUI/custom_nodes:/home/comfyui/custom_nodes"  -v "${PWD}/models:/home/comfyui/models" -v "${PWD}/outputs:/home/comfyui/output" sd-comfyui:20231214
 #
