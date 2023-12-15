@@ -6,11 +6,10 @@ ARG PORT=7860
 # debian 下安装访问 http://deb.debian.org/debian 等需要设置代理
 # ENV http_proxy="http://${PROXY}"
 # ENV https_proxy="http://${PROXY}"
-# ENV all_proxy="socks5://${PROXY}"
 
 # 安装基础包
 RUN --mount=type=cache,target=/var/cache/apt \ 
-    export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}" all_proxy="socks5://${PROXY}" && \
+    export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}" && \
     env | grep proxy && echo "----- install vim net-tools telnet libgl1 -----" && \
     apt-get update && \
     apt-get install -y vim-tiny net-tools telnet && \
@@ -42,12 +41,12 @@ RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
     export http_proxy="" https_proxy="" all_proxy="" && \
     env | grep proxy && echo "----- install torch and torchvision -----" && \
     # resolv the err: Using SOCKS proxy, but the 'socksio' package is not installed
-    pip install httpx[socks] && \
+    # pip install httpx[socks] && \
     python3 -m pip install torch==2.0.1 torchvision==0.15.2 --extra-index-url https://download.pytorch.org/whl/cu118
 
 # 提前于 webui.sh 安装 clip, openclip，安装 clip 需要开启代理，否则一定失败
 RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
-    export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}" all_proxy="socks5://${PROXY}" && \
+    export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}" && \
     env | grep proxy && echo "----- install clip and open_clip -----" && \
     grep "clip_package = os.environ.get('CLIP_PACKAGE'" modules/launch_utils.py | cut -d '"' -f 2 | xargs -I {} python3 -m pip install {} && \
     grep "openclip_package = os.environ.get('OPENCLIP_PACKAGE'" modules/launch_utils.py | cut -d '"' -f 2 | xargs -I {} python3 -m pip install {}
@@ -82,7 +81,7 @@ RUN grep "k_diffusion_commit_hash = os.environ.get('K_DIFFUSION_COMMIT_HASH'" mo
     xargs -I {} ./clone.sh "k-diffusion" "https://github.com/crowsonkb/k-diffusion.git" {} 
 
 # CodeFormer 和 BLIP 两个的 github 仓库都需要加代理才能 clone 成功
-RUN export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}" all_proxy="socks5://${PROXY}" && \
+RUN export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}" && \
     env | grep proxy && echo "----- clone CodeFormer and BLIP -----" && \
     grep "codeformer_commit_hash = os.environ.get('CODEFORMER_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 | \
     xargs -I {} ./clone.sh "CodeFormer" "https://github.com/sczhou/CodeFormer.git" {} && \
@@ -108,7 +107,7 @@ ENV EXIT_ON_IMAGE_BUILD=1
 # 修改 launch_utils.py，在 start() 函数开始时，设置一个退出点，以使 docker build 过程不要直接启动 webui 服务
 RUN sed -i '/def start():/a \ \ \ \ \n\ \ \ \ # ------ make a docker build cache point ------ \n\ \ \ \ if os.getenv("EXIT_ON_IMAGE_BUILD") == "1":\n\ \ \ \ \ \ \ \ print("EXIT_ON_IMAGE_BUILD is 1, exiting.")\n\ \ \ \ \ \ \ \ sys.exit()\n' ./modules/launch_utils.py && \
     # 在 start() 函数开始时清除代理设置 
-    sed -i '/def start():/a \ \ \ \ \n\ \ \ \ # ------ clean proxy begin ------ \n\ \ \ \ os.environ.pop("http_proxy", None)\n\ \ \ \ os.environ.pop("https_proxy", None)\n\ \ \ \ os.environ.pop("all_proxy", None)\n\ \ \ \ print("Current proxy settings:")\n\ \ \ \ for key in ["http_proxy", "https_proxy", "all_proxy"]:\n\ \ \ \ \ \ \ \ print(f"{key}={os.environ.get(key)}")\n\ \ \ \ # ------ clean proxy end ------\n\ \ \ \ ' ./modules/launch_utils.py && \
+    # sed -i '/def start():/a \ \ \ \ \n\ \ \ \ # ------ clean proxy begin ------ \n\ \ \ \ os.environ.pop("http_proxy", None)\n\ \ \ \ os.environ.pop("https_proxy", None)\n\ \ \ \ print("Current proxy settings:")\n\ \ \ \ for key in ["http_proxy", "https_proxy", "all_proxy"]:\n\ \ \ \ \ \ \ \ print(f"{key}={os.environ.get(key)}")\n\ \ \ \ # ------ clean proxy end ------\n\ \ \ \ ' ./modules/launch_utils.py && \
     # 修改 repositories 代码文件，将 clip-vit-large-patch14 的路径改为本地路径，避免从 huggingface.co 下载
     sed -i 's|"openai/clip-vit-large-patch14"|"/home/sd-webui/huggingface.co/openai/clip-vit-large-patch14"|g' ./repositories/stable-diffusion-stability-ai/ldm/modules/encoders/modules.py  && \
     sed -i 's|"openai/clip-vit-large-patch14"|"/home/sd-webui/huggingface.co/openai/clip-vit-large-patch14"|g' ./repositories/generative-models/sgm/modules/encoders/modules.py
