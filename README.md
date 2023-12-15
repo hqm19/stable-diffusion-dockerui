@@ -193,6 +193,7 @@ stable-diffusion-dockerui/
 
 ```
 nohup docker build -f ./Dockerfile_ComfyUI --build-arg PROXY=10.10.0.8:10887 --build-arg PORT=7980 -t sd-comfyui:20231214 . > build.log 2>&1 &
+tail -100f build.log
 ```
 
 直到镜像构建完成。如果中途因网络问题中断，只需反复重新执行这条 build 语句。docker 构建过程会缓存中间结果, 将失败重试时重复的下载和安装降到最低
@@ -242,14 +243,22 @@ drwxr-xr-x  2 root root 4096 Dec 13 22:23 ControlNet/
 软链接准备好后，在 stable-diffusion-dockerui 下执行 docker run 启动 ComfyUI 容器：
 
 ```
-docker run --name sd-comfyui --gpus all -d -p 7980:7980 -v "${PWD}/ComfyUI/custom_nodes:/home/comfyui/custom_nodes"  -v "${PWD}/models:/home/comfyui/models" -v "${PWD}/outputs:/home/comfyui/output" sd-comfyui:20231214
-
 docker run --name sd-comfyui --gpus all -d -p 7980:7980 \
   -v "${PWD}/ComfyUI/custom_nodes:/home/comfyui/custom_nodes" \
   -v "${PWD}/models:/home/comfyui/models" \
-  -v "${PWD}/huggingface.co:/home/comfyui/huggingface.co" \
-  -v "${PWD}/outputs:/home/comfyui/output" sd-comfyui:20231212 \
-  python -u main.py --listen --port 7980
+  -v "${PWD}/outputs:/home/comfyui/output" sd-comfyui:20231214
+```
+
+其中 -p 7980:7980 指定的端口号, 要和镜像构建时指定的 --build-arg PORT=7980 一致。
+
+也可以在上面 docker run 命令后加如下 CMD 命令，覆盖镜像中默认的端口和参数：
+
+```
+docker run --name sd-comfyui --gpus all -d -p 9980:9980 \
+  -v "${PWD}/ComfyUI/custom_nodes:/home/comfyui/custom_nodes" \
+  -v "${PWD}/models:/home/comfyui/models" \
+  -v "${PWD}/outputs:/home/comfyui/output" sd-comfyui:20231214 \
+  python -u main.py --listen --port 9980
 ```
 
 # windows 环境
