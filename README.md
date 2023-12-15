@@ -17,7 +17,7 @@ Stable Diffusion DockerUI
 ## 前置条件
 
 * 科学上网畅通，在 host 本地暴露了代理端口。
-* 100G+ 硬盘
+* 20G+ 硬盘（后面下载的模型越多，需要的硬盘越多）
 * docker 环境可用
 
 以下过程，是在 NVIDIA RTX 3090 上调试通过的。其他非 NVIDIA 硬件环境应该在 torch 安装部分有部分差异，需要根据 webui/comfyui 等文档来调整。
@@ -209,7 +209,7 @@ sd-comfyui   20231214   d05c3d7ca9d0   10 hours ago    6.51GB
 2. 将 Dockerfile 文件同目录通过 git clone 得到的代码主目录 ./ComfyUI 拷贝到镜像中
 3. 安装 torch torchvision torchaudio 以 https://download.pytorch.org/whl/cu121 为源
 4. 安装 ComfyUI 自身和其插件对应的依赖。
-5. 设置好将来镜像启动时的 CMD 为 ./webui.sh -f
+5. 设置好将来镜像启动时的 CMD 为 python -u main.py --listen --port ${PORT}
 
 ### ComfyUI 容器启动方式
 
