@@ -1,8 +1,10 @@
 Stable Diffusion DockerUI
 =======
 
-为 Stable Diffusion 流行的 UI 工程编写的 Dockerfile, 主要目的是为了解决国内网络不流畅的问题。正常安装过程中，部分资源需要科学上网，部分资源又需要直连才能成功。所以在 Dockerfile 中统一解决这些问题。希望自己和别人不需要重复折腾。
+为 Stable Diffusion 流行的 UI 工程编写的 Dockerfile
 -----------
+
+主要目的是为了解决国内网络不稳定不畅通的问题。正常安装过程中，部分资源需要科学上网，部分资源又需要直连才能成功。所以在 Dockerfile 中统一解决这些问题。希望自己和需要的人不需要再重复折腾了。
 
 可以一键构建如下 UI 的 Docker 镜像：
 * [Stable Diffusion WebUI](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
@@ -15,9 +17,10 @@ Stable Diffusion DockerUI
 ## 前置条件
 
 * 科学上网畅通，在 host 本地暴露了代理端口。
-* N卡
 * 100G+ 硬盘
 * docker 环境可用
+
+以下过程，是在 NVIDIA RTX 3090 上调试通过的。其他非 NVIDIA 硬件环境应该在 torch 安装部分有部分差异，需要根据 webui/comfyui 等文档来调整。
 
 ## Stable Diffusion WebUI
 
