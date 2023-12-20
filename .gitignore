@@ -1,0 +1,8 @@
+stable-diffusion-webui
+ComfyUI
+models
+outputs
+extensions
+huggingface.co
+embeddings
+*.log
