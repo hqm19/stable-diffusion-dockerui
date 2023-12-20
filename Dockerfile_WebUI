@@ -33,8 +33,6 @@ RUN --mount=type=cache,target=/var/cache/apt \
 # drwxr-xr-x 16 root root  4096 Dec  7 23:30 stable-diffusion-webui/
 #
 COPY ./stable-diffusion-webui /home/sd-webui
-WORKDIR /home/sd-webui/extensions/sd-webui-controlnet
-COPY ./extensions/sd-webui-controlnet/requirements.txt /home/sd-webui/extensions/sd-webui-controlnet/requirements.txt
 WORKDIR /home/sd-webui
 
 # 提前于 webui.sh 安装 torch, torchvision, 方便 docker build 缓存；
@@ -93,6 +91,7 @@ RUN export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}" && \
     grep "blip_commit_hash = os.environ.get('BLIP_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 | \
     xargs -I {} ./clone.sh "BLIP" "https://github.com/salesforce/BLIP.git" {} 
 
+COPY ./extensions/sd-webui-controlnet/requirements.txt /home/sd-webui/extensions/sd-webui-controlnet/
 # 提前于 webui.sh 安装 CodeFormer requirements 和 stable-diffusion-webui 自身的 requirements_versions.txt
 RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
     echo "----- install CodeFormer requirements -----" && \
