@@ -91,6 +91,7 @@ RUN export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}" && \
     grep "blip_commit_hash = os.environ.get('BLIP_COMMIT_HASH'" modules/launch_utils.py | cut -d '"' -f 2 | \
     xargs -I {} ./clone.sh "BLIP" "https://github.com/salesforce/BLIP.git" {} 
 
+COPY ./extensions/sd-webui-controlnet/requirements.txt /home/sd-webui/extensions/sd-webui-controlnet/requirements.txt
 # 提前于 webui.sh 安装 CodeFormer requirements 和 stable-diffusion-webui 自身的 requirements_versions.txt
 RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
     echo "----- install CodeFormer requirements -----" && \
