@@ -2,6 +2,8 @@ FROM python:3.10.6
 
 ARG PROXY
 ARG PORT=7960
+# 设置pip源为阿里云pip源
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
 # debian 下安装访问 http://deb.debian.org/debian 等需要设置代理
 # ENV http_proxy="http://${PROXY}"

@@ -2,6 +2,8 @@ FROM python:3.10.6
 
 ARG PROXY
 ARG PORT=7860
+# 设置pip源为阿里云pip源
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
 # debian 下安装访问 http://deb.debian.org/debian 等需要设置代理
 # ENV http_proxy="http://${PROXY}"
@@ -94,7 +96,10 @@ RUN --mount=type=cache,target=/root/.cache/pip ls -l /root/.cache/pip && \
     echo "----- install CodeFormer requirements -----" && \
     pip install -r ./repositories/CodeFormer/requirements.txt && \
     echo "----- install requirements -----" && \
-    pip install -r requirements_versions.txt
+    pip install -r requirements_versions.txt  && \
+    export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}" && \
+    env | grep proxy && echo "----- install requirements of sd-webui-controlnet -----" && \
+    pip install -r extensions/sd-webui-controlnet/requirements.txt
 
 ARG AUTH=rtx3090:ST0Nbs5AL+5hy4J
 # 因为容器已经提供了完美的隔离环境，不需要其他 python 隔离手段了，所以关闭 venv
